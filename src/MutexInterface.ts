@@ -1,15 +1,17 @@
 interface MutexInterface {
-    acquire(priority?: number): Promise<MutexInterface.Releaser>;
+    acquire(priority?: number, name?: string): Promise<MutexInterface.Releaser>;
 
     runExclusive<T>(callback: MutexInterface.Worker<T>, priority?: number): Promise<T>;
 
-    waitForUnlock(priority?: number): Promise<void>;
+    waitForUnlock(priority?: number, name?: string): Promise<void>;
 
     isLocked(): boolean;
 
-    release(): void;
+    release(name?: string): void;
 
     cancel(): void;
+
+    printQueue(): void;
 }
 
 namespace MutexInterface {
@@ -23,3 +25,11 @@ namespace MutexInterface {
 }
 
 export default MutexInterface;
+
+export interface SimpleMutexInterface {
+    acquire(name: string): Promise<MutexInterface.Releaser>;
+
+    waitForUnlock(name: string, priority?: number): Promise<void>;
+
+    release(name: string): void;
+}

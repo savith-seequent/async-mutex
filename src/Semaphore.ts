@@ -1,12 +1,12 @@
 import { E_CANCELED } from './errors';
 import SemaphoreInterface from './SemaphoreInterface';
 
-
 interface Priority {
     priority: number;
 }
 
 interface QueueEntry {
+    name?: string;
     resolve(result: [number, SemaphoreInterface.Releaser]): void;
     reject(error: unknown): void;
     weight: number;
@@ -14,23 +14,29 @@ interface QueueEntry {
 }
 
 interface Waiter {
+    name: string;
     resolve(): void;
     priority: number;
 }
 
 class Semaphore implements SemaphoreInterface {
-    constructor(private _value: number, private _cancelError: Error = E_CANCELED) {}
+    constructor(
+        private _value: number,
+        private _cancelError: Error = E_CANCELED,
+        private _startTime = Date.now(),
+    ) {}
 
-    acquire(weight = 1, priority = 0): Promise<[number, SemaphoreInterface.Releaser]> {
+    acquire(weight = 1, priority = 0, name?: string): Promise<[number, SemaphoreInterface.Releaser]> {
         if (weight <= 0) throw new Error(`invalid weight ${weight}: must be positive`);
 
         return new Promise((resolve, reject) => {
-            const task: QueueEntry = { resolve, reject, weight, priority };
+            const task: QueueEntry = { name, resolve, reject, weight, priority };
             const i = findIndexFromEnd(this._queue, (other) => priority <= other.priority);
             if (i === -1 && weight <= this._value) {
                 // Needs immediate dispatch, skip the queue
                 this._dispatchItem(task);
             } else {
+                this._log('[ADD TO ACQUIRE QUEUE]', name);
                 this._queue.splice(i + 1, 0, task);
             }
         });
@@ -46,7 +52,9 @@ class Semaphore implements SemaphoreInterface {
         }
     }
 
-    waitForUnlock(weight = 1, priority = 0): Promise<void> {
+    waitForUnlock(weight = 1, priority = 0, name?: string): Promise<void> {
+        this._log('[WAIT_FOR_UNLOCK]', name);
+
         if (weight <= 0) throw new Error(`invalid weight ${weight}: must be positive`);
 
         if (this._couldLockImmediately(weight, priority)) {
@@ -54,7 +62,7 @@ class Semaphore implements SemaphoreInterface {
         } else {
             return new Promise((resolve) => {
                 if (!this._weightedWaiters[weight - 1]) this._weightedWaiters[weight - 1] = [];
-                insertSorted(this._weightedWaiters[weight - 1], { resolve, priority });
+                insertSorted(this._weightedWaiters[weight - 1], { name, resolve, priority });
             });
         }
     }
@@ -72,7 +80,13 @@ class Semaphore implements SemaphoreInterface {
         this._dispatchQueue();
     }
 
-    release(weight = 1): void {
+    printQueue(): void {
+        console.log(this._queue);
+    }
+
+    release(weight = 1, name?: string): void {
+        this._log('[RELEASE]', name);
+
         if (weight <= 0) throw new Error(`invalid weight ${weight}: must be positive`);
 
         this._value += weight;
@@ -93,6 +107,7 @@ class Semaphore implements SemaphoreInterface {
     }
 
     private _dispatchItem(item: QueueEntry): void {
+        this._log('[ACQUIRE]', item.name);
         const previousValue = this._value;
         this._value -= item.weight;
         item.resolve([previousValue, this._newReleaser(item.weight)]);
@@ -115,6 +130,7 @@ class Semaphore implements SemaphoreInterface {
                 const waiters = this._weightedWaiters[weight - 1];
                 if (!waiters) continue;
                 waiters.forEach((waiter) => waiter.resolve());
+                this._log('[WAITERS DRAINED]', waiters.length.toString());
                 this._weightedWaiters[weight - 1] = [];
             }
         } else {
@@ -123,15 +139,33 @@ class Semaphore implements SemaphoreInterface {
                 const waiters = this._weightedWaiters[weight - 1];
                 if (!waiters) continue;
                 const i = waiters.findIndex((waiter) => waiter.priority <= queuedPriority);
-                (i === -1 ? waiters : waiters.splice(0, i))
-                    .forEach((waiter => waiter.resolve()));
+                (i === -1 ? waiters : waiters.splice(0, i)).forEach((waiter) => waiter.resolve());
             }
         }
     }
 
     private _couldLockImmediately(weight: number, priority: number) {
-        return (this._queue.length === 0 || this._queue[0].priority < priority) &&
-            weight <= this._value;
+        return (this._queue.length === 0 || this._queue[0].priority < priority) && weight <= this._value;
+    }
+
+    private _log(message: string, name?: string) {
+        if (name) {
+            const timeDifference = Date.now() - this._startTime;
+            const paddedTimeDifference = String(timeDifference).padStart(4, '0');
+
+            console.log(
+                '\x1b[36m',
+                paddedTimeDifference,
+                'MS',
+                '\x1b[0m',
+                '\x1b[1m',
+                name,
+                '\x1b[0m',
+                '\x1b[33m',
+                message,
+                '\x1b[0m',
+            );
+        }
     }
 
     private _queue: Array<QueueEntry> = [];

@@ -43,25 +43,24 @@ export const mutexSuite = (factory: (cancelError?: Error) => MutexInterface): vo
             // Scheduled immediately
             mutex.acquire(0).then((release) => {
                 values.push(0);
-                setTimeout(release, 100)
+                setTimeout(release, 100);
             });
 
             // Low priority task
             mutex.acquire(-1).then((release) => {
                 values.push(-1);
-                setTimeout(release, 100)
+                setTimeout(release, 100);
             });
 
             // High priority task; jumps the queue
             mutex.acquire(1).then((release) => {
                 values.push(1);
-                setTimeout(release, 100)
+                setTimeout(release, 100);
             });
 
             await clock.runAllAsync();
             assert.deepStrictEqual(values, [0, 1, -1]);
-        })
-    );
+        }));
 
     test('runExclusive passes result (immediate)', async () => {
         assert.strictEqual(await mutex.runExclusive(() => 10), 10);
@@ -74,7 +73,7 @@ export const mutexSuite = (factory: (cancelError?: Error) => MutexInterface): vo
     test('runExclusive passes rejection', async () => {
         await assert.rejects(
             mutex.runExclusive(() => Promise.reject(new Error('foo'))),
-            new Error('foo')
+            new Error('foo'),
         );
     });
 
@@ -83,7 +82,7 @@ export const mutexSuite = (factory: (cancelError?: Error) => MutexInterface): vo
             mutex.runExclusive(() => {
                 throw new Error('foo');
             }),
-            new Error('foo')
+            new Error('foo'),
         );
     });
 
@@ -97,8 +96,8 @@ export const mutexSuite = (factory: (cancelError?: Error) => MutexInterface): vo
                         setTimeout(() => {
                             flag = true;
                             resolve(undefined);
-                        }, 50)
-                    )
+                        }, 50),
+                    ),
             );
 
             assert(!flag);
@@ -110,9 +109,15 @@ export const mutexSuite = (factory: (cancelError?: Error) => MutexInterface): vo
 
     test('runExclusive unblocks the highest-priority task first', async () => {
         const values: number[] = [];
-        mutex.runExclusive(() => { values.push(0); }, 0);
-        mutex.runExclusive(() => { values.push(-1); }, -1);
-        mutex.runExclusive(() => { values.push(+1); }, +1);
+        mutex.runExclusive(() => {
+            values.push(0);
+        }, 0);
+        mutex.runExclusive(() => {
+            values.push(-1);
+        }, -1);
+        mutex.runExclusive(() => {
+            values.push(+1);
+        }, +1);
         await clock.runAllAsync();
         assert.deepStrictEqual(values, [0, +1, -1]);
     });
@@ -303,24 +308,64 @@ export const mutexSuite = (factory: (cancelError?: Error) => MutexInterface): vo
     });
 
     test('waitForUnlock unblocks high-priority waiters before low-priority queued tasks', async () => {
-        mutex.acquire(0);  // Immediately scheduled
-        mutex.acquire(0);  // Waiting
+        mutex.acquire(0); // Immediately scheduled
+        mutex.acquire(0); // Waiting
         let flag = false;
-        mutex.waitForUnlock(1).then(() => { flag = true; });
+        mutex.waitForUnlock(1).then(() => {
+            flag = true;
+        });
         mutex.release();
         await clock.tickAsync(0);
         assert.strictEqual(flag, true);
     });
 
     test('waitForUnlock unblocks low-priority waiters after high-priority queued tasks', async () => {
-        mutex.acquire(0);  // Immediately scheduled
-        mutex.acquire(0);  // Waiting
+        mutex.acquire(0); // Immediately scheduled
+        mutex.acquire(0); // Waiting
         let flag = false;
-        mutex.waitForUnlock(-1).then(() => { flag = true; });
+        mutex.waitForUnlock(-1).then(() => {
+            flag = true;
+        });
         mutex.release();
         await clock.tickAsync(0);
         assert.strictEqual(flag, false);
     });
+
+    test.only('waitForUnlock and acquire with multiple items', async () => {
+        // disable clock for this test
+        clock.uninstall();
+
+        mutex = factory();
+        const arr: number[] = [];
+
+        const customTask = async (val: number, delayMs: number) => {
+            const name = `TASK ${val}: ${String(delayMs).padStart(4, '0')} MS DURATION`;
+            await mutex.waitForUnlock(undefined, name);
+            await mutex.acquire(undefined, name);
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            arr.push(val);
+            mutex.release(name);
+        };
+
+        const promises: Promise<void>[] = [];
+
+        promises.push(customTask(0, 1000)); // WAIT_FOR_UNLOCK AT T=0000; ADD_TO_ACQUIRE_QUEUE AT T=0000; ACQUIRE LOCK AT T=0000; RELEASE_LOCK AT T=1000
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        promises.push(customTask(1, 1500)); // WAIT_FOR_UNLOCK AT T=0500; ADD_TO_ACQUIRE_QUEUE AT T=1000; ACQUIRE LOCK AT T=1000; RELEASE_LOCK AT T=2500
+        promises.push(customTask(2, 1000)); // WAIT_FOR_UNLOCK AT T=0500; ADD_TO_ACQUIRE_QUEUE AT T=1000; ACQUIRE LOCK AT T=2500; RELEASE_LOCK AT T=3500
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        promises.push(customTask(3, 500)); // WAIT_FOR_UNLOCK AT T=1500; ADD_TO_ACQUIRE_QUEUE AT T=3500; ACQUIRE LOCK AT T=3500; RELEASE_LOCK AT T=4000
+        promises.push(customTask(4, 100)); // WAIT_FOR_UNLOCK AT T=1500; ADD_TO_ACQUIRE_QUEUE AT T=3500; ACQUIRE LOCK AT T=4000; RELEASE_LOCK AT T=4100
+        promises.push(customTask(5, 600)); // WAIT_FOR_UNLOCK AT T=1500; ADD_TO_ACQUIRE_QUEUE AT T=3500; ACQUIRE LOCK AT T=4100; RELEASE_LOCK AT T=4700
+
+        await Promise.all(promises);
+
+        assert.deepEqual(arr, [0, 1, 2, 3, 4, 5]);
+    }).timeout(100000);
 };
 
 suite('Mutex', () => mutexSuite((e) => new Mutex(e)));

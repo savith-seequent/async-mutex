@@ -1,9 +1,9 @@
 interface SemaphoreInterface {
-    acquire(weight?: number, priority?: number): Promise<[number, SemaphoreInterface.Releaser]>;
+    acquire(weight?: number, priority?: number, name?: string): Promise<[number, SemaphoreInterface.Releaser]>;
 
     runExclusive<T>(callback: SemaphoreInterface.Worker<T>, weight?: number, priority?: number): Promise<T>;
 
-    waitForUnlock(weight?: number, priority?: number): Promise<void>;
+    waitForUnlock(weight?: number, priority?: number, name?: string): Promise<void>;
 
     isLocked(): boolean;
 
@@ -11,9 +11,11 @@ interface SemaphoreInterface {
 
     setValue(value: number): void;
 
-    release(weight?: number): void;
+    release(weight?: number, name?: string): void;
 
     cancel(): void;
+
+    printQueue(): void;
 }
 
 namespace SemaphoreInterface {
