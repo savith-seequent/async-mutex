@@ -42,9 +42,9 @@ jobs:
   test-results:
     needs: conditional-test-that-could-be-skipped
     runs-on: ubuntu-latest
+    if: always()  # This ensures this step runs regardless of previous step success/failure
     steps:
       - name: Check the result of the Random Fail Workflow
-        if: always()  # This ensures this step runs regardless of previous step success/failure
         run: |
           if [[ "${{ needs.conditional-test-that-could-be-skipped.result }}" == "failure" ]]; then
             echo "❌ Nested workflow failed!"
