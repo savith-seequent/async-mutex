@@ -34,7 +34,7 @@ jobs:
       - name: Skip Tests
         run: echo "No GTM changes, skipping E2E tests."
 
-  random-fail:
+  conditional-test-that-could-be-skipped:
     needs: check-files
     if: needs.check-files.outputs.backend_changed == 'true'
     uses: ./.github/workflows/random-fail.yaml
