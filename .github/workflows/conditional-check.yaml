@@ -38,3 +38,16 @@ jobs:
     needs: check-files
     if: needs.check-files.outputs.backend_changed == 'true'
     uses: ./.github/workflows/random-fail.yaml
+
+  test-results:
+    needs: conditional-test-that-could-be-skipped
+    steps:
+      - name: Check the result of the Random Fail Workflow
+        if: always()  # This ensures this step runs regardless of previous step success/failure
+        run: |
+          if [[ "${{ needs.conditional-test-that-could-be-skipped.result }}" == "failure" ]]; then
+            echo "❌ Nested workflow failed!"
+            exit 1  # Fail this step if the nested workflow failed
+          else
+            echo "✅ Nested workflow completed successfully."
+          fi
