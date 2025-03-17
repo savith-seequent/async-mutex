@@ -20,11 +20,9 @@ jobs:
       - name: Check for Backend File Changes
         id: filter
         run: |
-          if git diff --name-only origin/$GITHUB_BASE_REF | grep '^backend/'; then
-            echo "backend_changed=true" >> $GITHUB_ENV
+          if git diff --name-only origin/$GITHUB_BASE_REF | grep '^backend/nested/'; then
             echo "backend_changed=true" >> $GITHUB_OUTPUT
           else
-            echo "backend_changed=false" >> $GITHUB_ENV
             echo "backend_changed=false" >> $GITHUB_OUTPUT
           fi
 
