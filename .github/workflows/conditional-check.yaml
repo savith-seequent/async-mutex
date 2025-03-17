@@ -1,4 +1,4 @@
-name: Random Failure Test
+name: conditional-check
 
 on:  
   pull_request:
