@@ -51,3 +51,10 @@ jobs:
             echo "❌ Random Failure!"
             exit 1
           fi
+
+  conditional-check:
+    name: Workflow Complete
+    needs: [check-files, skip-tests, random-fail]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Condiioonal Check Workflow Complete"
