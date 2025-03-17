@@ -36,6 +36,5 @@ jobs:
 
   random-fail:
     needs: check-files
-    runs-on: ubuntu-latest
     if: needs.check-files.outputs.backend_changed == 'true'
     uses: ./.github/workflows/random-fail.yaml
