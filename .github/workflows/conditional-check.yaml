@@ -41,6 +41,7 @@ jobs:
 
   test-results:
     needs: conditional-test-that-could-be-skipped
+    runs-on: ubuntu-latest
     steps:
       - name: Check the result of the Random Fail Workflow
         if: always()  # This ensures this step runs regardless of previous step success/failure
