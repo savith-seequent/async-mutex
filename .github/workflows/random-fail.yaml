@@ -1,0 +1,22 @@
+name: random-fail
+
+on:
+  workflow_call:  # This allows this workflow to be called from other workflows
+
+jobs:
+  random-fail-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Random Failure Step
+        run: |
+          echo "Randomly determining failure..."
+          # Generate a random number between 0 and 1 (50% chance for success or failure)
+          if [ $((RANDOM % 2)) -eq 0 ]; then
+            echo "✅ Success!"
+          else
+            echo "❌ Random Failure!"
+            exit 1  # Fail the job if the random number is odd
+          fi
