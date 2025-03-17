@@ -6,18 +6,26 @@ on:
 jobs:
   check-files:
     runs-on: ubuntu-latest
+    outputs:
+      backend_changed: ${{ steps.filter.outputs.backend_changed }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 2  # Ensures we have history to compare
+          fetch-depth: 0
+
+      - name: Fetch Base Branch
+        run: git fetch origin $GITHUB_BASE_REF --depth=1
 
       - name: Check for Backend File Changes
+        id: filter
         run: |
-          if git diff --name-only HEAD^ HEAD | grep '^backend/nested'; then
-            echo "backend_changed=true" >> "$GITHUB_OUTPUT"
+          if git diff --name-only origin/$GITHUB_BASE_REF | grep '^backend/'; then
+            echo "backend_changed=true" >> $GITHUB_ENV
+            echo "backend_changed=true" >> $GITHUB_OUTPUT
           else
-            echo "backend_changed=false" >> "$GITHUB_OUTPUT"
+            echo "backend_changed=false" >> $GITHUB_ENV
+            echo "backend_changed=false" >> $GITHUB_OUTPUT
           fi
 
   skip-tests:
