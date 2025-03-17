@@ -34,20 +34,21 @@ jobs:
       - name: Skip Tests
         run: echo "No GTM changes, skipping E2E tests."
 
-  random-fail:
+  conditional-test-that-could-be-skipped:
     needs: check-files
-    runs-on: ubuntu-latest
     if: needs.check-files.outputs.backend_changed == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    uses: ./.github/workflows/random-fail.yaml
 
-      - name: Random Failure Step
+  test-results:
+    needs: conditional-test-that-could-be-skipped
+    runs-on: ubuntu-latest
+    if: always()  # This ensures this step runs regardless of previous step success/failure
+    steps:
+      - name: Check the result of the Random Fail Workflow
         run: |
-          if [ $((RANDOM % 2)) -eq 0 ]; then
-            echo "✅ Success!"
-            exit 0
+          if [[ "${{ needs.conditional-test-that-could-be-skipped.result }}" == "failure" ]]; then
+            echo "❌ Nested workflow failed!"
+            exit 1  # Fail this step if the nested workflow failed
           else
-            echo "❌ Random Failure!"
-            exit 1
+            echo "✅ Nested workflow completed successfully."
           fi
